@@ -7,9 +7,12 @@ import os
 import cv2
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
-from torchvision import transforms
+from torchvision import models, transforms
+import matplotlib
+matplotlib.use("Agg")  # headless backend — no plt.show() popups
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 
@@ -161,7 +164,7 @@ def run_gradcam(
 
     if save_path:
         plt.savefig(save_path, dpi=150)
-    plt.show()
+    plt.close(fig)  # free memory, no blocking popup
 
     return result
 
@@ -174,3 +177,24 @@ def get_target_layer_efficientnet(model) -> torch.nn.Module:
 def get_target_layer_resnet(model) -> torch.nn.Module:
     """Returns layer4 of a torchvision/timm ResNet."""
     return model.layer4[-1]
+
+
+# ─── RESNET50 MODEL LOADER ───────────────────────────────────────────────────
+def load_resnet50_model(
+    model_path: str,
+    num_classes: int = 6,
+    device: torch.device = DEVICE,
+) -> torch.nn.Module:
+    """
+    Load a trained ResNet50 with the same FC head architecture used in
+    train_resnet50.py: Dropout(0.3) → Linear(2048, num_classes).
+    """
+    model = models.resnet50(weights=None)
+    model.fc = nn.Sequential(
+        nn.Dropout(0.3),
+        nn.Linear(model.fc.in_features, num_classes),
+    )
+    state = torch.load(model_path, map_location=device, weights_only=True)
+    model.load_state_dict(state)
+    model.eval().to(device)
+    return model
