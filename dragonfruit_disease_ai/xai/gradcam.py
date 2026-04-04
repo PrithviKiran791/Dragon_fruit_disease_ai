@@ -10,11 +10,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from PIL import Image
-from torchvision import models, transforms
+from torchvision import transforms
 import matplotlib
 matplotlib.use("Agg")  # headless backend — no plt.show() popups
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+
+from models.convitx import build_convitx_base
 
 IMG_SIZE = 224
 DEVICE   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -174,27 +176,28 @@ def get_target_layer_efficientnet(model) -> torch.nn.Module:
     """Returns the last convolutional block of a timm EfficientNet."""
     return model.blocks[-1]
 
-def get_target_layer_resnet(model) -> torch.nn.Module:
-    """Returns layer4 of a torchvision/timm ResNet."""
-    return model.layer4[-1]
 
 
-# ─── RESNET50 MODEL LOADER ───────────────────────────────────────────────────
-def load_resnet50_model(
+
+def get_target_layer_convitx(model) -> torch.nn.Module:
+    """Returns the fusion convolutional layer for ConViTX Grad-CAM hooks."""
+    return model.fusion_conv[0]
+
+
+
+
+
+def load_convitx_model(
     model_path: str,
     num_classes: int = 6,
     device: torch.device = DEVICE,
 ) -> torch.nn.Module:
-    """
-    Load a trained ResNet50 with the same FC head architecture used in
-    train_resnet50.py: Dropout(0.3) → Linear(2048, num_classes).
-    """
-    model = models.resnet50(weights=None)
-    model.fc = nn.Sequential(
-        nn.Dropout(0.3),
-        nn.Linear(model.fc.in_features, num_classes),
-    )
-    state = torch.load(model_path, map_location=device, weights_only=True)
+    """Load ConViTXBase checkpoint under edge parameter budget."""
+    model = build_convitx_base(num_classes=num_classes, enforce_budget=False)
+    try:
+        state = torch.load(model_path, map_location=device, weights_only=True)
+    except Exception:
+        state = torch.load(model_path, map_location=device, weights_only=False)
     model.load_state_dict(state)
     model.eval().to(device)
     return model

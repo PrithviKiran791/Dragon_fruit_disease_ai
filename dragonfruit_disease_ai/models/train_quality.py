@@ -1,11 +1,12 @@
 """
-Train ResNet50 for Dragon Fruit Quality Grading.
+Train lightweight ConViTXSmall for Dragon Fruit Quality Grading.
+Primary objective: keep trainable parameter count <= 700,000 for remote deployment.
 
 Default dataset layout expected:
   dataset/Dragon Fruit Quality Grading Dataset/Augmented Dataset/<class_name>/*.jpg
 
 Outputs:
-  - quality_resnet50.pth
+  - quality_convitx.pth
   - quality_training_curves.png
   - quality_classes.txt
 """
@@ -25,9 +26,26 @@ try:
 except ImportError:
     _HAS_DML = False
 from sklearn.metrics import classification_report
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, models, transforms
+from sklearn.model_selection import train_test_split
+from torch.utils.data import DataLoader, Subset
+from torchvision import datasets, transforms
 from torchvision.transforms import functional as TF
+
+import torch.nn.functional as F
+from convitx import build_convitx_base, count_parameters
+
+
+class FocalLoss(nn.Module):
+    """Focal Loss — suppresses easy examples and focuses on hard misclassifications."""
+    def __init__(self, gamma=2.0, label_smoothing=0.1):
+        super().__init__()
+        self.gamma = gamma
+        self.label_smoothing = label_smoothing
+
+    def forward(self, inputs, targets):
+        ce_loss = F.cross_entropy(inputs, targets, label_smoothing=self.label_smoothing, reduction='none')
+        pt = torch.exp(-ce_loss)
+        return ((1 - pt) ** self.gamma * ce_loss).mean()
 
 
 class RandomBrightnessContrast:
@@ -61,16 +79,16 @@ def parse_args():
         )
     )
 
-    parser = argparse.ArgumentParser(description="Train quality grading model (ResNet50)")
+    parser = argparse.ArgumentParser(description="Train quality grading model (ConViTXSmall)")
     parser.add_argument("--data-dir", type=str, default=default_data_dir, help="ImageFolder data directory")
     parser.add_argument("--save-dir", type=str, default=script_dir, help="Output directory for model and plots")
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--batch-size", type=int, default=16)
-    parser.add_argument("--lr", type=float, default=1e-4)
+    parser.add_argument("--lr", type=float, default=3e-4) # Higher LR for ConViTX from scratch
     parser.add_argument("--train-split", type=float, default=0.8)
     parser.add_argument("--img-size", type=int, default=224)
     parser.add_argument("--num-workers", type=int, default=0)
-    parser.add_argument("--patience", type=int, default=7)
+    parser.add_argument("--patience", type=int, default=8)
     return parser.parse_args()
 
 
@@ -81,6 +99,7 @@ def build_transforms(img_size: int) -> Tuple[transforms.Compose, transforms.Comp
         transforms.RandomRotation(20),
         RandomBrightnessContrast(brightness=0.25, contrast=0.25, p=0.7),
         transforms.ColorJitter(saturation=0.2, hue=0.02),
+        transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
     ])
@@ -119,16 +138,19 @@ def main():
     if num_classes < 2:
         raise ValueError(f"At least 2 classes required, found: {class_names}")
 
-    train_size = int(len(full_dataset) * args.train_split)
-    val_size = len(full_dataset) - train_size
-    if train_size == 0 or val_size == 0:
-        raise ValueError("Invalid split. Adjust --train-split so train and val contain samples.")
-
-    train_subset, val_subset = random_split(
-        full_dataset,
-        [train_size, val_size],
-        generator=torch.Generator().manual_seed(42),
+    targets = [s[1] for s in full_dataset.samples]
+    train_idx, val_idx = train_test_split(
+        range(len(full_dataset)), 
+        train_size=args.train_split, 
+        random_state=42, 
+        stratify=targets
     )
+    
+    train_size = len(train_idx)
+    val_size = len(val_idx)
+
+    train_subset = Subset(full_dataset, train_idx)
+    val_subset = Subset(full_dataset, val_idx)
 
     train_subset.dataset = copy.copy(full_dataset)
     train_subset.dataset.transform = train_tf
@@ -148,24 +170,34 @@ def main():
         num_workers=args.num_workers,
     )
 
-    model = models.resnet50(weights="DEFAULT")
-    for name, param in model.named_parameters():
-        if "layer3" not in name and "layer4" not in name and "fc" not in name:
-            param.requires_grad = False
+    model = build_convitx_base(num_classes=num_classes, enforce_budget=True).to(device)
+    param_count = count_parameters(model)
 
-    model.fc = nn.Sequential(
-        nn.Dropout(0.3),
-        nn.Linear(model.fc.in_features, num_classes),
-    )
-    model = model.to(device)
+    criterion = FocalLoss(gamma=2.0, label_smoothing=0.1)
+    
+    # Configure parameter groups for dynamic weight decay
+    if str(device).startswith("privateuseone"):
+        optimizer = torch.optim.SGD(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=1e-5,
+        )
+    else:
+        optimizer = torch.optim.AdamW(
+            model.parameters(),
+            lr=args.lr,
+            weight_decay=1e-5,
+            foreach=False,
+            fused=False,
+        )
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(
-        filter(lambda p: p.requires_grad, model.parameters()),
-        lr=args.lr,
-        weight_decay=1e-4,
+    # Warmup for 3 epochs then cosine decay (mirrors train_convitx.py)
+    warmup_epochs = 3
+    warmup_scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=0.1, total_iters=warmup_epochs)
+    cosine_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs - warmup_epochs)
+    scheduler = torch.optim.lr_scheduler.SequentialLR(
+        optimizer, schedulers=[warmup_scheduler, cosine_scheduler], milestones=[warmup_epochs]
     )
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
     history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": []}
     # Start below any real accuracy so epoch 1 is always checkpointed.
@@ -173,7 +205,7 @@ def main():
     best_state = None
     patience_counter = 0
 
-    model_path = os.path.join(save_dir, "quality_resnet50.pth")
+    model_path = os.path.join(save_dir, "quality_convitx.pth")
     curve_path = os.path.join(save_dir, "quality_training_curves.png")
     class_map_path = os.path.join(save_dir, "quality_classes.txt")
 
@@ -181,6 +213,7 @@ def main():
     print(f"Dataset      : {data_dir}")
     print(f"Classes      : {class_names}")
     print(f"Train/Val    : {train_size}/{val_size}")
+    print(f"Parameters   : {param_count:,} trainable (budget <= 700,000)")
 
     start = time.time()
     for epoch in range(1, args.epochs + 1):
@@ -234,7 +267,7 @@ def main():
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             best_state = copy.deepcopy(model.state_dict())
-            torch.save(best_state, model_path)
+            torch.save(best_state, model_path, _use_new_zipfile_serialization=False)
             patience_counter = 0
             print(f"  New best model saved: {model_path} (val_acc={best_val_acc:.4f})")
         else:

@@ -89,6 +89,14 @@ The model classifies dragon fruit images into **6 classes** with the following d
 - **FC head**: `Dropout(0.3) → Linear(2048, 6)`
 - **Trainable parameters**: ~15.9M / 25.6M total
 
+### Architecture: ConViTXSmall (Edge Hybrid, <0.7M params)
+
+- **Design**: CNN stem (local lesion texture) + Transformer encoder (global context)
+- **Use case**: Remote/low-resource deployment with strict memory and compute limits
+- **Parameter budget**: hard-capped at `<= 700,000` trainable params in code
+- **Checkpoint name**: `models/best_convitx.pth`
+- **Auto-selection at runtime**: Flask uses ConViTX if `best_convitx.pth` exists, otherwise falls back to ResNet50
+
 ### Training Configuration
 
 | Parameter | Value |
@@ -315,6 +323,18 @@ python models/train_resnet50.py \
     --data-dir "dataset/Dragon Fruit (Pitahaya)/Dragon Fruit (Pitahaya)/Converted Images"
 ```
 
+### Option 3: Train the Edge ConViTX Hybrid (recommended for remote areas)
+
+```bash
+python models/train_convitx.py \
+       --epochs 30 \
+       --batch-size 32 \
+       --num-workers 0 \
+       --data-dir "dataset/Dragon Fruit (Pitahaya)/Dragon Fruit (Pitahaya)/Converted Images"
+```
+
+This saves `models/best_convitx.pth`. If the file is present, the Flask app automatically uses it for disease inference.
+
 **Training CLI arguments:**
 
 | Argument | Default | Description |
@@ -333,7 +353,7 @@ python models/train_resnet50.py \
 
 | Layer | Technology |
 |-------|-----------|
-| **Deep Learning** | PyTorch + torchvision (ResNet50) |
+| **Deep Learning** | PyTorch + torchvision (ResNet50 + ConViTXSmall hybrid) |
 | **XAI** | Custom Grad-CAM implementation |
 | **Backend** | Flask (Python) |
 | **Frontend** | HTML5, CSS3 (Glassmorphism), JavaScript |

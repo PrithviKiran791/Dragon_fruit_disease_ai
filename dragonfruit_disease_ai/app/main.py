@@ -17,16 +17,15 @@ from flask import Flask, render_template, request, redirect, url_for, flash
 from PIL import Image
 import torch
 import torch.nn as nn
-from torchvision import models
 
 # ── Project root setup ────────────────────────────────────────────────────────
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
 
 from xai.gradcam import (
-    load_resnet50_model,
+    load_convitx_model,
     run_gradcam,
-    get_target_layer_resnet,
+    get_target_layer_convitx,
     infer_transforms,
 )
 from chatbot.advisor import (
@@ -36,8 +35,8 @@ from chatbot.advisor import (
 )
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-DISEASE_MODEL_PATH = os.path.join(ROOT, "models", "best_resnet50.pth")
-QUALITY_MODEL_PATH = os.path.join(ROOT, "models", "quality_resnet50.pth")
+DISEASE_MODEL_PATH = os.path.join(ROOT, "models", "best_convitx.pth")
+QUALITY_MODEL_PATH = os.path.join(ROOT, "models", "quality_convitx.pth")
 
 DISEASE_CLASS_NAMES = [
     "Anthracnose",
@@ -74,21 +73,6 @@ _disease_target_layer = None
 _quality_model = None
 
 
-def _build_quality_model(model_path: str, num_classes: int):
-    model = models.resnet50(weights=None)
-    model.fc = nn.Sequential(
-        nn.Dropout(0.3),
-        nn.Linear(model.fc.in_features, num_classes),
-    )
-    try:
-        state = torch.load(model_path, map_location="cpu", weights_only=True)
-    except Exception:
-        state = torch.load(model_path, map_location="cpu", weights_only=False)
-    model.load_state_dict(state)
-    model.eval()
-    return model
-
-
 def _load_quality_classes():
     if not os.path.exists(QUALITY_CLASS_FILE):
         return QUALITY_CLASS_NAMES
@@ -106,11 +90,11 @@ def _load_quality_classes():
 def _get_disease_artifacts():
     global _disease_model, _disease_target_layer
     if _disease_model is None:
-        _disease_model = load_resnet50_model(
+        _disease_model = load_convitx_model(
             DISEASE_MODEL_PATH,
             num_classes=len(DISEASE_CLASS_NAMES),
         )
-        _disease_target_layer = get_target_layer_resnet(_disease_model)
+        _disease_target_layer = get_target_layer_convitx(_disease_model)
     return _disease_model, _disease_target_layer
 
 
@@ -118,9 +102,10 @@ def _get_quality_model():
     global _quality_model
     if _quality_model is None:
         quality_classes = _load_quality_classes()
-        _quality_model = _build_quality_model(
+        _quality_model = load_convitx_model(
             QUALITY_MODEL_PATH,
             num_classes=len(quality_classes),
+            device=torch.device("cpu")
         )
     return _quality_model
 
@@ -168,7 +153,7 @@ def predict_disease():
     try:
         disease_model, disease_target_layer = _get_disease_artifacts()
     except FileNotFoundError:
-        flash("Disease model not found. Train or place best_resnet50.pth in models/.", "error")
+        flash("Disease model not found. Train best_convitx.pth in models/.", "error")
         return redirect(url_for("disease_page"))
 
     # Run Grad-CAM inference
@@ -228,7 +213,7 @@ def predict_quality():
     try:
         quality_model = _get_quality_model()
     except FileNotFoundError:
-        flash("Quality model not found. Train quality_resnet50.pth in models/.", "error")
+        flash("Quality model not found. Train quality_convitx.pth in models/.", "error")
         return redirect(url_for("quality_page"))
 
     pil_img = Image.open(img_path).convert("RGB")
