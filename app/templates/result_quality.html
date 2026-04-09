@@ -76,4 +76,118 @@
 <div style="text-align: center; margin-top: 1.6rem;">
     <a href="{{ url_for('quality_page') }}" class="btn btn-outline">Grade Another Fruit</a>
 </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     ASK AGROBOT — Floating Chat Button + Panel
+     ═══════════════════════════════════════════════════════════════════ -->
+
+<!-- FAB Button -->
+<button class="fab-chat" id="fabChat" onclick="toggleChat()" title="Ask Agrobot">
+    <i data-lucide="message-circle" style="width:26px;height:26px;"></i>
+    <span class="fab-badge"></span>
+</button>
+
+<!-- Chat Panel -->
+<div class="chat-panel" id="chatPanel">
+    <div class="chat-panel-header">
+        <h3><i data-lucide="bot" style="width:18px;height:18px;"></i> Agrobot Assistant</h3>
+        <button class="chat-panel-close" onclick="toggleChat()"><i data-lucide="x" style="width:18px;height:18px;"></i></button>
+    </div>
+    <div class="chat-panel-body" id="chatBody">
+        <div class="chat-bubble bot">
+            Hi! I'm Agrobot, your agricultural assistant.
+        </div>
+        <div class="chat-bubble bot">
+            I can see you're looking at a <strong>{{ prediction }}</strong> grading
+            with <strong>{{ '%.0f'|format(confidence * 100) }}%</strong> confidence.
+        </div>
+        <div class="chat-bubble bot">
+            Ask me anything about this grade or market recommendations!
+        </div>
+    </div>
+    <div class="chat-panel-input">
+        <input type="text" id="chatInput" placeholder="Ask about this grade..."
+               onkeypress="if(event.key==='Enter')sendChatMessage()">
+        <button onclick="sendChatMessage()"><i data-lucide="send" style="width:16px;height:16px;"></i></button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+if(typeof lucide !== 'undefined') lucide.createIcons();
+
+function toggleChat() {
+    const panel = document.getElementById('chatPanel');
+    const fab   = document.getElementById('fabChat');
+    panel.classList.toggle('open');
+    const badge = fab.querySelector('.fab-badge');
+    if (badge) badge.style.display = 'none';
+}
+
+let chatHistory = [];
+const chatContext = `Mode: Quality Grading. Predicted Grade: {{ prediction }}. Confidence: {{ '%.1f'|format(confidence * 100) }}%. Market Recommendation: {{ quality_advice.market_recommendation }}. Action points: {{ quality_advice.action_points | join(' ') }}`;
+
+async function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    const body  = document.getElementById('chatBody');
+    const text  = input.value.trim();
+    if (!text) return;
+
+    const userBubble = document.createElement('div');
+    userBubble.className = 'chat-bubble user';
+    userBubble.textContent = text;
+    body.appendChild(userBubble);
+
+    input.value = '';
+    body.scrollTop = body.scrollHeight;
+
+    const botBubble = document.createElement('div');
+    botBubble.className = 'chat-bubble bot loading';
+    botBubble.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    body.appendChild(botBubble);
+    body.scrollTop = body.scrollHeight;
+
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                message: text,
+                context: chatContext,
+                history: chatHistory
+            })
+        });
+        
+        const data = await response.json();
+        body.removeChild(botBubble);
+        
+        if (data.success) {
+            chatHistory = data.history;
+            const finalBotBubble = document.createElement('div');
+            finalBotBubble.className = 'chat-bubble bot';
+            finalBotBubble.innerHTML = data.reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+            body.appendChild(finalBotBubble);
+        } else {
+            const errorBubble = document.createElement('div');
+            errorBubble.className = 'chat-bubble bot';
+            errorBubble.textContent = "Error: " + data.error;
+            body.appendChild(errorBubble);
+        }
+        body.scrollTop = body.scrollHeight;
+    } catch (err) {
+        body.removeChild(botBubble);
+        const errorBubble = document.createElement('div');
+        errorBubble.className = 'chat-bubble bot';
+        errorBubble.textContent = "Failed to reach the assistant.";
+        body.appendChild(errorBubble);
+        body.scrollTop = body.scrollHeight;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const body = document.getElementById('chatBody');
+    if (body) body.scrollTop = body.scrollHeight;
+});
+</script>
 {% endblock %}

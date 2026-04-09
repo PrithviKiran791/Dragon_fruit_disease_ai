@@ -24,10 +24,19 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 from PIL import Image
 import torch
 import torch.nn as nn
+import google.generativeai as genai
+from dotenv import load_dotenv
 
 # ── Project root setup ────────────────────────────────────────────────────────
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, ROOT)
+
+# Load secret environment variables from .env file securely from project root
+env_path = os.path.join(ROOT, ".env")
+load_dotenv(dotenv_path=env_path)
+
+# Configure GenAI. Using empty string allows it to easily fail gracefully if not available.
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
 
 from xai.gradcam import (
     load_convitx_model,
@@ -472,6 +481,68 @@ def api_analyze():
         else:
             return jsonify({"success": False, "error": f"Unknown mode: {mode}"}), 400
 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    """Gemini-powered Chatbot Endpoint for continuous conversation."""
+    data = request.get_json(force=True)
+    message = data.get("message", "")
+    context = data.get("context", "")
+    history = data.get("history", [])
+
+    if not message:
+        return jsonify({"success": False, "error": "No message provided"}), 400
+
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        # Build contents array following Gemini API format for history
+        contents = history.copy()
+        
+        # If it's the first message, prepend the system context
+        if not contents:
+            system_instruction = f"You are Agrobot, an agricultural AI assistant. You have just analyzed a user's image. Analysis context: {context}. Respond to the user concisely, safely, and professionally."
+            contents.append({"role": "user", "parts": [f"System Instruction: {system_instruction}\n\nUser: {message}"]})
+        else:
+            contents.append({"role": "user", "parts": [message]})
+
+        import time
+        max_retries = 3
+        retry_delay = 2 # start with 2 seconds
+
+        for attempt in range(max_retries):
+            try:
+                response = model.generate_content(contents)
+                reply = response.text
+                break # Success, exit retry loop
+            except Exception as api_err:
+                if "429" in str(api_err) or "Quota" in str(api_err):
+                    if attempt < max_retries - 1:
+                        print(f"Rate limit hit. Retrying in {retry_delay} seconds... (Attempt {attempt+1}/{max_retries})")
+                        time.sleep(retry_delay)
+                        retry_delay *= 2 # exponential backoff
+                    else:
+                        raise Exception("Agrobot is currently experiencing high traffic. Please try again in about a minute.")
+                else:
+                    raise api_err # re-raise other errors immediately
+        
+        # Append the assistant's response to history to track it
+        contents.append({"role": "model", "parts": [reply]})
+        
+        # We may want to format the first history item to hide the system instruction from future raw text
+        if len(history) == 0:
+            # We overwrite the first user message in returned history to be just user's message,
+            # but wait, Gemini needs the full system prompt again on subsequent turns if we don't supply it via system_instruction param properly (since google-generativeai may not have direct system_instruction in old versions). 
+            # We'll just leave it as is, or we use system_instruction if the library supports it.
+            # To be safe across versions, we just keep the whole string in the history array.
+            pass
+
+        return jsonify({"success": True, "reply": reply, "history": contents})
     except Exception as e:
         import traceback
         traceback.print_exc()
