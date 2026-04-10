@@ -363,8 +363,10 @@ function toggleChat() {
     if (badge) badge.style.display = 'none';
 }
 
-/* ── Chat Message (Placeholder — connects to your friend's API later) */
-function sendChatMessage() {
+let chatHistory = [];
+const chatContext = `Mode: {{ mode }}. Prediction: {{ prediction|default('Unknown') }}. Confidence: {{ '%.1f'|format((confidence|default(0)) * 100) }}%. {% if advisory %}Severity: {{ advisory.severity|default('Unknown') }}. Plan: {{ advisory.treatment_steps | join(' ') }}. {% endif %}{% if mode == 'detect' and total_lesions is defined %}Total Lesions: {{ total_lesions }}. {% endif %}`;
+
+async function sendChatMessage() {
     const input = document.getElementById('chatInput');
     const body  = document.getElementById('chatBody');
     const text  = input.value.trim();
@@ -379,28 +381,49 @@ function sendChatMessage() {
     input.value = '';
     body.scrollTop = body.scrollHeight;
 
-    // Simulated bot response (placeholder)
-    setTimeout(() => {
-        const botBubble = document.createElement('div');
-        botBubble.className = 'chat-bubble bot';
+    // Add loading bubble
+    const botBubble = document.createElement('div');
+    botBubble.className = 'chat-bubble bot loading';
+    botBubble.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
+    body.appendChild(botBubble);
+    body.scrollTop = body.scrollHeight;
 
-        // Context-aware placeholder responses
-        const disease = '{{ prediction }}';
-        const responses = {
-            'Anthracnose': `For Anthracnose, I recommend applying Prochloraz (500 ppm) as your primary fungicide. Would you like specific dosage calculations for your orchard size?`,
-            'Stem_Canker': `Stem Canker requires immediate pruning of infected cladodes. Apply 5% amino-oligosaccharide solution to cut surfaces. Shall I explain the application process?`,
-            'Soft_Rot': `Soft Rot is bacterial — stop watering immediately and remove all infected tissue. Copper hydroxide (77%) is your best bactericide. Need application details?`,
-            'Brown_Stem_Spot': `Brown Stem Spot responds well to propiconazole (0.1%) or difenoconazole. Apply at 14-day intervals. Want me to explain the spray schedule?`,
-            'Gray_Blight': `Gray Blight is often secondary — check for wounds or storm damage first. Apply mancozeb (0.25%) and improve canopy airflow. Any questions about pruning techniques?`,
-            'Healthy': `Your plant looks healthy! Keep up the routine monitoring. Would you like tips on preventive care or optimal growing conditions?`,
-        };
-
-        botBubble.innerHTML = responses[disease] ||
-            `Thank you for your question about "${text}". The Knowledge Agent is being integrated by your team. Once connected, I'll provide detailed, AI-powered answers specific to your diagnosis.`;
-
-        body.appendChild(botBubble);
+    try {
+        const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                message: text,
+                context: chatContext,
+                history: chatHistory
+            })
+        });
+        
+        const data = await response.json();
+        body.removeChild(botBubble);
+        
+        if (data.success) {
+            chatHistory = data.history;
+            const finalBotBubble = document.createElement('div');
+            finalBotBubble.className = 'chat-bubble bot';
+            // Basic markdown string parsing 
+            finalBotBubble.innerHTML = data.reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+            body.appendChild(finalBotBubble);
+        } else {
+            const errorBubble = document.createElement('div');
+            errorBubble.className = 'chat-bubble bot';
+            errorBubble.textContent = "Error: " + data.error;
+            body.appendChild(errorBubble);
+        }
         body.scrollTop = body.scrollHeight;
-    }, 800);
+    } catch (err) {
+        body.removeChild(botBubble);
+        const errorBubble = document.createElement('div');
+        errorBubble.className = 'chat-bubble bot';
+        errorBubble.textContent = "Failed to reach the assistant.";
+        body.appendChild(errorBubble);
+        body.scrollTop = body.scrollHeight;
+    }
 }
 
 /* ── Auto-scroll chat on load ─────────────────────────────────────── */
