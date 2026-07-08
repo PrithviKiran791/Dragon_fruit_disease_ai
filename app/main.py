@@ -21,7 +21,8 @@ import base64
 import io
 import requests
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask_babel import Babel, gettext as _
 from PIL import Image
 import torch
 import torch.nn as nn
@@ -88,6 +89,29 @@ GEMINI_API_URL = (
 # ── Flask app ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = "dragonfruit-secret-key"
+
+# ── Flask-Babel i18n ──────────────────────────────────────────────────────────
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "hi": "हिंदी",
+    "kn": "ಕನ್ನಡ",
+    "te": "తెలుగు",
+    "ta": "தமிழ்",
+    "ml": "മലയാളം",
+    "mr": "मराठी",
+    "gu": "ગુજરાતી",
+    "bn": "বাংলা",
+    "pa": "ਪੰਜਾਬੀ",
+    "or": "ଓଡ଼ିଆ",
+    "as": "অসমীয়া",
+    "ur": "اردو",
+    "sa": "संस्कृतम्",
+}
+
+def get_locale():
+    return session.get("lang", "en")
+
+babel = Babel(app, locale_selector=get_locale)
 
 # ── Serve custom icons from project-root icons/ folder ────────────────────────
 ICONS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icons")
@@ -571,6 +595,26 @@ def disease_page():
     return render_template("disease.html", diseases=DISEASE_KNOWLEDGE)
 
 
+@app.route("/encyclopedia")
+def encyclopedia_page():
+    """Disease Encyclopedia with economic impact data and multilingual support."""
+    return render_template(
+        "encyclopedia.html",
+        diseases=DISEASE_KNOWLEDGE,
+        languages=SUPPORTED_LANGUAGES,
+        current_lang=session.get("lang", "en"),
+    )
+
+
+@app.route("/set-language/<lang_code>")
+def set_language(lang_code):
+    """Switch the UI language and redirect back to referring page."""
+    if lang_code in SUPPORTED_LANGUAGES:
+        session["lang"] = lang_code
+    referrer = request.referrer or url_for("encyclopedia_page")
+    return redirect(referrer)
+
+
 @app.route("/quality")
 def quality_page():
     return render_template("quality.html")
@@ -734,7 +778,7 @@ def predict_quality():
 @app.route("/detect")
 def detect_page():
     """YOLOv8 lesion detector upload page."""
-    return render_template("detect.html", yolo_classes=YOLO_CLASS_NAMES)
+    return render_template("detect.html", yolo_classes=YOLO_CLASS_NAMES, diseases=DISEASE_KNOWLEDGE)
 
 
 @app.route("/predict_detect", methods=["POST"])

@@ -21,6 +21,86 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous"></script>
     <!-- jsPDF — canvas-to-PDF engine -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous"></script>
+<style>
+/* ── Language Switcher (Google Translate) ───────────────────── */
+.lang-switcher { position: relative; display: inline-flex; align-items: center; margin-left: 0.4rem; }
+
+/* Hide Google Translate's default top bar and branding */
+.goog-te-banner-frame, .skiptranslate { display: none !important; }
+body { top: 0 !important; }
+.goog-te-gadget { font-size: 0 !important; }
+.goog-te-gadget .goog-te-combo {
+    font-family: inherit;
+    font-size: 0.78rem !important;
+    padding: 0.32rem 0.6rem !important;
+    border-radius: 99px !important;
+    border: 1px solid var(--border) !important;
+    background: transparent !important;
+    color: var(--text-primary) !important;
+    cursor: pointer;
+    outline: none;
+    max-width: 130px;
+    appearance: none;
+    -webkit-appearance: none;
+}
+body.dark-mode .goog-te-gadget .goog-te-combo {
+    background: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border) !important;
+    color-scheme: dark;
+}
+.goog-te-gadget .goog-te-combo:hover {
+    border-color: var(--text-primary) !important;
+}
+/* Wrap the select with a globe icon */
+.lang-select-wrap {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border); border-radius: 99px;
+    padding: 0.28rem 0.55rem 0.28rem 0.7rem;
+    cursor: pointer; font-size: 0.78rem; color: var(--text-secondary);
+    transition: border-color 0.18s, background 0.18s;
+    position: relative;
+}
+.lang-select-wrap:hover { border-color: var(--text-primary); background: var(--bg-surface); }
+/* The actual native select is absolutely overlaid */
+.lang-select-wrap select {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+}
+@keyframes fadeInDown { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: translateY(0); } }
+</style>
+    <!-- Google Translate hidden element -->
+    <div id="google_translate_element" style="display:none;"></div>
+    <script type="text/javascript">
+    function googleTranslateElementInit() {
+        new google.translate.TranslateElement({
+            pageLanguage: 'en',
+            includedLanguages: 'hi,kn,te,ta,ml,mr,gu,bn,pa,or,as,ur,sa',
+            layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+            autoDisplay: false
+        }, 'google_translate_element');
+    }
+    function doGTranslate(lang_pair) {
+        if (lang_pair === 'en|en') {
+            // Restore English: reload without translation cookie
+            document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
+            document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + location.hostname;
+            location.reload();
+            return;
+        }
+        var lang = lang_pair.split('|')[1];
+        document.cookie = 'googtrans=/en/' + lang + '; path=/';
+        document.cookie = 'googtrans=/en/' + lang + '; path=/; domain=' + location.hostname;
+        // Trigger via hidden GT combo if available, else reload
+        var combo = document.querySelector('.goog-te-combo');
+        if (combo) {
+            combo.value = lang;
+            combo.dispatchEvent(new Event('change'));
+        } else {
+            location.reload();
+        }
+    }
+    </script>
+    <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
 </head>
 <body>
 <canvas id="particles-canvas" style="position:fixed; inset:0; z-index:0; pointer-events:none; opacity:0.6;"></canvas>
@@ -34,9 +114,35 @@
             <a href="{{ url_for('detect_page') }}" class="{% if request.endpoint in ['detect_page', 'predict_detect'] %}active{% endif %}">Lesion Detector</a>
             <a href="{{ url_for('camera_page') }}" class="{% if request.endpoint == 'camera_page' %}active{% endif %}"><i data-lucide="scan-line" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;"></i> Live Scanner</a>
             <a href="{{ url_for('vqa_page') }}" class="{% if request.endpoint in ['vqa_page', 'predict_vqa'] %}active{% endif %}"><i data-lucide="message-square" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;"></i> VQA</a>
+            <a href="{{ url_for('encyclopedia_page') }}" class="{% if request.endpoint == 'encyclopedia_page' %}active{% endif %}"><i data-lucide="book-open" style="width:14px;height:14px;vertical-align:middle;margin-right:2px;"></i> Encyclopedia</a>
             {% if request.endpoint in ['predict_disease', 'predict_detect', 'camera_result'] %}
             <a href="#" class="active"><img src="/icons/medical-record-icon-report-vector-isolated-illustration-white-background-168809770.webp" alt="" class="nav-icon"> Prescription</a>
             {% endif %}
+            <!-- Google Translate Language Switcher -->
+            <div class="lang-switcher" id="lang-switcher-wrap">
+                <div class="lang-select-wrap" title="Translate page to Indian language">
+                    <i data-lucide="globe" style="width:13px;height:13px;flex-shrink:0;"></i>
+                    <span style="font-size:0.76rem;font-weight:500;pointer-events:none;">Translate</span>
+                    <i data-lucide="chevron-down" style="width:11px;height:11px;flex-shrink:0;pointer-events:none;"></i>
+                    <!-- Native select overlaid — triggers Google Translate -->
+                    <select id="gt-lang-select" onchange="doGTranslate(this.value)" title="Select language">
+                        <option value="en|en">English</option>
+                        <option value="en|hi">🇮🇳 हिंदी</option>
+                        <option value="en|kn">🇮🇳 ಕನ್ನಡ</option>
+                        <option value="en|te">🇮🇳 తెలుగు</option>
+                        <option value="en|ta">🇮🇳 தமிழ்</option>
+                        <option value="en|ml">🇮🇳 മലയാളം</option>
+                        <option value="en|mr">🇮🇳 मराठी</option>
+                        <option value="en|gu">🇮🇳 ગુજરાતી</option>
+                        <option value="en|bn">🇮🇳 বাংলা</option>
+                        <option value="en|pa">🇮🇳 ਪੰਜਾਬੀ</option>
+                        <option value="en|or">🇮🇳 ଓଡ଼ିଆ</option>
+                        <option value="en|as">🇮🇳 অসমীয়া</option>
+                        <option value="en|ur">🇮🇳 اردو</option>
+                        <option value="en|sa">🇮🇳 संस्कृतम्</option>
+                    </select>
+                </div>
+            </div>
             <button id="theme-toggle" class="btn btn-outline" style="padding: 0.4rem 0.7rem; border-radius: 99px; display: inline-flex; align-items: center; justify-content: center; margin-left: 0.5rem; background: transparent; cursor: pointer;" aria-label="Toggle Dark Mode">
                 <span id="theme-icon-moon" style="display: flex;"><i data-lucide="moon" style="width:16px;height:16px;"></i></span>
                 <span id="theme-icon-sun" style="display: none;"><i data-lucide="sun" style="width:16px;height:16px;"></i></span>
@@ -199,6 +305,23 @@
 </script>
 
 {% block scripts %}{% endblock %}
+
+<script>
+// Restore language select to match current translation cookie
+(function() {
+    var sel = document.getElementById('gt-lang-select');
+    if (!sel) return;
+    var m = document.cookie.match(/googtrans=\/en\/([^;]+)/);
+    if (m) {
+        var lang = m[1];
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value === 'en|' + lang) {
+                sel.selectedIndex = i; break;
+            }
+        }
+    }
+})();
+</script>
 <script>if(typeof lucide !== 'undefined') lucide.createIcons();</script>
 </body>
 </html>

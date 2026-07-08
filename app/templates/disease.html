@@ -92,6 +92,164 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- ── Floating Encyclopedia Reference Button ──────────────── -->
+<style>
+.enc-fab {
+    position: fixed; bottom: 1.8rem; right: 1.5rem; z-index: 500;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+.enc-fab-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0.65rem 1.1rem;
+    background: var(--text-primary); color: var(--bg-dark);
+    border: none; border-radius: 99px; cursor: pointer;
+    font-size: 0.82rem; font-weight: 700; font-family: inherit;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.18);
+    transition: transform 0.2s, box-shadow 0.2s;
+    white-space: nowrap;
+}
+.enc-fab-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.28); }
+.enc-fab-btn img { width: 16px; height: 16px; object-fit: contain; }
+body.dark-mode .enc-fab-btn img { filter: invert(1); }
+
+/* Slide-up reference panel */
+.enc-ref-panel {
+    position: fixed; bottom: 5.5rem; right: 1.5rem; z-index: 499;
+    width: min(420px, calc(100vw - 2rem));
+    max-height: 60vh; overflow-y: auto;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.22);
+    padding: 0;
+    transform: translateY(20px) scale(0.97);
+    opacity: 0; pointer-events: none;
+    transition: transform 0.25s cubic-bezier(.34,1.56,.64,1), opacity 0.2s;
+    scrollbar-width: thin;
+}
+.enc-ref-panel.open {
+    transform: translateY(0) scale(1);
+    opacity: 1; pointer-events: all;
+}
+.enc-ref-panel-header {
+    position: sticky; top: 0; z-index: 2;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.9rem 1.1rem 0.7rem;
+    background: var(--card-bg); border-bottom: 1px solid var(--border);
+    border-radius: 18px 18px 0 0;
+}
+.enc-ref-panel-header h3 {
+    font-size: 0.88rem; font-weight: 800; color: var(--text-primary);
+    margin: 0; display: flex; align-items: center; gap: 6px;
+}
+.enc-ref-panel-header a {
+    font-size: 0.72rem; color: var(--text-muted); text-decoration: none;
+    border: 1px solid var(--border); border-radius: 99px;
+    padding: 0.22rem 0.65rem; transition: all 0.15s;
+}
+.enc-ref-panel-header a:hover { border-color: var(--text-primary); color: var(--text-primary); }
+.enc-ref-close {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); padding: 0.2rem; border-radius: 6px;
+    font-size: 1rem; line-height: 1;
+    transition: color 0.15s;
+}
+.enc-ref-close:hover { color: var(--text-primary); }
+.enc-ref-body { padding: 0.75rem 1rem 1rem; }
+
+/* Compact disease cards in the panel */
+.enc-ref-card {
+    display: flex; gap: 10px; align-items: flex-start;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--border);
+    cursor: default;
+}
+.enc-ref-card:last-child { border-bottom: none; }
+.enc-ref-img {
+    width: 64px; height: 64px; border-radius: 8px;
+    object-fit: cover; flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+}
+.enc-ref-info { flex: 1; min-width: 0; }
+.enc-ref-name {
+    font-size: 0.85rem; font-weight: 700;
+    color: var(--text-primary); margin-bottom: 2px;
+}
+.enc-ref-sev {
+    display: inline-block; font-size: 0.65rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    padding: 0.15rem 0.5rem; border-radius: 99px;
+    border: 1px solid var(--border);
+    background: var(--bg-surface); color: var(--text-muted);
+    margin-bottom: 3px;
+}
+.enc-ref-sev.sev-veryhigh { background: var(--text-primary); color: var(--bg-dark); border-color: var(--text-primary); }
+.enc-ref-cues {
+    font-size: 0.73rem; color: var(--text-secondary);
+    line-height: 1.45; margin: 0;
+}
+</style>
+
+<!-- FAB -->
+<div class="enc-fab">
+    <button class="enc-fab-btn" id="encFabBtn" onclick="toggleEncPanel()">
+        <img src="/icons/1730090.png" alt="encyclopedia">
+        Disease Reference
+    </button>
+</div>
+
+<!-- Reference Panel -->
+<div class="enc-ref-panel" id="encRefPanel">
+    <div class="enc-ref-panel-header">
+        <h3>
+            <img src="/icons/8645362.png" style="width:16px;height:16px;object-fit:contain;" alt="">
+            Visual Disease Reference
+        </h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <a href="{{ url_for('encyclopedia_page') }}" target="_blank">Full Encyclopedia ↗</a>
+            <button class="enc-ref-close" onclick="toggleEncPanel()" title="Close">✕</button>
+        </div>
+    </div>
+    <div class="enc-ref-body">
+        {% for name, info in diseases.items() %}
+        <div class="enc-ref-card">
+            {% if info.reference_image %}
+            <img class="enc-ref-img"
+                 src="{{ url_for('static', filename=info.reference_image) }}"
+                 alt="{{ name }}"
+                 onerror="this.src='';this.style.background='var(--bg-surface)';">
+            {% else %}
+            <div class="enc-ref-img" style="display:flex;align-items:center;justify-content:center;">🌿</div>
+            {% endif %}
+            <div class="enc-ref-info">
+                <div class="enc-ref-name">{{ name.replace('_', ' ') }}</div>
+                <span class="enc-ref-sev {{ 'sev-veryhigh' if info.severity == 'Very High' }}">{{ info.severity }}</span>
+                <p class="enc-ref-cues">{{ info.visual_cues[0] if info.visual_cues else info.description[:80] + '…' }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function toggleEncPanel() {
+    const panel = document.getElementById('encRefPanel');
+    const isOpen = panel.classList.contains('open');
+    panel.classList.toggle('open', !isOpen);
+    // Close on outside click
+    if (!isOpen) {
+        setTimeout(() => {
+            document.addEventListener('click', function outsideClose(e) {
+                if (!panel.contains(e.target) && !document.getElementById('encFabBtn').contains(e.target)) {
+                    panel.classList.remove('open');
+                    document.removeEventListener('click', outsideClose);
+                }
+            });
+        }, 10);
+    }
+}
+</script>
 <script>
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');

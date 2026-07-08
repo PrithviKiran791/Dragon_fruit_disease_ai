@@ -1,0 +1,657 @@
+{% extends "base.html" %}
+
+{% block title %}Disease Encyclopedia — Dragon Fruit AI Suite{% endblock %}
+
+{% block content %}
+<style>
+/* ═══════════════════════════════════════════════════════════
+   ENCYCLOPEDIA PAGE — PREMIUM DESIGN SYSTEM
+   Inherits root theme variables from style.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;600;700;900&display=swap');
+
+:root {
+    --enc-radius: 20px;
+}
+
+/* ── Icon images ──────────────────────────────────────────── */
+.enc-ico {
+    width: 15px; height: 15px;
+    object-fit: contain; flex-shrink: 0;
+    display: inline-block; vertical-align: middle;
+    margin-right: 2px;
+}
+/* Invert black-on-white icons to white-on-dark in dark mode */
+body.dark-mode .enc-ico { filter: invert(1); }
+/* Dragon fruit hero icon: don't invert (it's colorful) */
+body.dark-mode .enc-ico-noinvert { filter: none !important; }
+/* Smaller inside filter pills */
+.enc-filter-pill .enc-ico { width: 12px; height: 12px; margin-right: 1px; }
+/* Image overlay label: always invert since bg is dark gradient */
+.enc-img-label .enc-ico { filter: invert(1) !important; width: 12px; height: 12px; }
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.enc-hero {
+    position: relative;
+    text-align: center;
+    padding: 3.5rem 2rem 2rem;
+    margin-bottom: 2rem;
+}
+.enc-hero-tag {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    font-size: 0.75rem; font-weight: 700;
+    padding: 0.35rem 1rem; border-radius: 99px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 1.2rem;
+}
+.enc-hero h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 900;
+    color: var(--text-primary);
+    line-height: 1.1;
+    margin: 0 0 1rem;
+    letter-spacing: -0.03em;
+}
+.enc-hero-sub {
+    font-size: 1rem; color: var(--text-secondary);
+    max-width: 620px; margin: 0 auto 1.5rem;
+    line-height: 1.7;
+}
+.enc-stats-row {
+    display: flex; justify-content: center; gap: 1rem;
+    flex-wrap: wrap; margin-top: 1.2rem;
+}
+.enc-stat-pill {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 0.55rem 1rem;
+    font-size: 0.82rem; color: var(--text-secondary);
+    transition: box-shadow 0.2s;
+}
+.enc-stat-pill:hover { box-shadow: var(--shadow); }
+.enc-stat-pill strong { color: var(--text-primary); font-size: 1rem; }
+
+/* ── Divider ──────────────────────────────────────────────── */
+.enc-divider {
+    border: none; border-top: 1px solid var(--border);
+    margin: 0 0 2rem;
+}
+
+/* ── Search/Filter Bar ────────────────────────────────────── */
+.enc-filter-bar {
+    display: flex; align-items: center; gap: 1rem;
+    margin: 0 auto 2rem;
+    max-width: 720px; flex-wrap: wrap; justify-content: center;
+}
+.enc-search-wrap { position: relative; flex: 1; min-width: 220px; }
+.enc-search-icon {
+    position: absolute; left: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted); pointer-events: none;
+    width: 15px; height: 15px;
+}
+#enc-search {
+    width: 100%; padding: 0.65rem 1rem 0.65rem 2.5rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px; color: var(--text-primary);
+    font-size: 0.88rem; outline: none; font-family: inherit;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+#enc-search::placeholder { color: var(--text-muted); }
+#enc-search:focus {
+    border-color: var(--text-primary);
+    box-shadow: 0 0 0 3px var(--border-glow);
+}
+.enc-filter-pills { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+.enc-filter-pill {
+    padding: 0.38rem 0.85rem; border-radius: 99px;
+    font-size: 0.76rem; font-weight: 600;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--text-secondary); cursor: pointer;
+    transition: all 0.18s; white-space: nowrap; font-family: inherit;
+}
+.enc-filter-pill:hover {
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    border-color: var(--text-primary);
+}
+.enc-filter-pill.active {
+    background: var(--text-primary);
+    color: var(--bg-dark);
+    border-color: var(--text-primary);
+}
+
+/* ── Disease Grid ─────────────────────────────────────────── */
+.enc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+@media (max-width: 480px) { .enc-grid { grid-template-columns: 1fr; } }
+
+/* ── Disease Card ─────────────────────────────────────────── */
+.enc-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    overflow: hidden;
+    transition: transform 0.28s cubic-bezier(.34,1.56,.64,1), box-shadow 0.28s;
+    position: relative;
+}
+.enc-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow), 0 0 0 1px var(--border-glow);
+}
+
+/* Severity top accent — monochrome intensity scale */
+.enc-card[data-severity="None"]     { border-top: 3px solid #555; }
+.enc-card[data-severity="Moderate"] { border-top: 3px solid #777; }
+.enc-card[data-severity="High"]     { border-top: 3px solid #333; }
+.enc-card[data-severity="Very High"]{ border-top: 4px solid #000; }
+body.dark-mode .enc-card[data-severity="None"]     { border-top-color: #999; }
+body.dark-mode .enc-card[data-severity="Moderate"] { border-top-color: #aaa; }
+body.dark-mode .enc-card[data-severity="High"]     { border-top-color: #ccc; }
+body.dark-mode .enc-card[data-severity="Very High"]{ border-top-color: #fff; }
+
+/* ── Card Header ──────────────────────────────────────────── */
+.enc-card-header {
+    padding: 1.3rem 1.4rem 0;
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 1rem;
+}
+.enc-disease-name {
+    font-size: 1.25rem; font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: -0.02em; line-height: 1.2;
+}
+.enc-pathogen {
+    font-size: 0.76rem; font-style: italic;
+    color: var(--text-muted); margin-top: 3px; line-height: 1.4;
+}
+.enc-severity-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 0.28rem 0.7rem; border-radius: 99px;
+    font-size: 0.7rem; font-weight: 700;
+    letter-spacing: 0.04em; text-transform: uppercase;
+    white-space: nowrap; flex-shrink: 0;
+    border: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+}
+/* Very High badge gets bolder styling */
+.sev-veryhigh {
+    background: var(--text-primary);
+    color: var(--bg-dark);
+    border-color: var(--text-primary);
+    animation: pulse-badge 2.2s ease-in-out infinite;
+}
+@keyframes pulse-badge {
+    0%,100% { box-shadow: 0 0 0 0 var(--border-glow); }
+    50%      { box-shadow: 0 0 0 5px transparent; }
+}
+
+/* ── Description ──────────────────────────────────────────── */
+.enc-desc {
+    font-size: 0.83rem; color: var(--text-secondary);
+    padding: 0.75rem 1.4rem 0; line-height: 1.65;
+}
+
+/* ── Reference Image ──────────────────────────────────────── */
+.enc-img-wrap {
+    margin: 1rem 1.4rem;
+    border-radius: 12px; overflow: hidden;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    position: relative; height: 210px;
+}
+.enc-img-wrap img {
+    width: 100%; height: 100%; object-fit: cover;
+    transition: transform 0.5s ease;
+    display: block;
+    filter: grayscale(15%);
+}
+.enc-card:hover .enc-img-wrap img {
+    transform: scale(1.04);
+    filter: grayscale(0%);
+}
+.enc-img-fallback {
+    position: absolute; inset: 0;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: var(--bg-surface);
+    color: var(--text-muted); font-size: 0.82rem; gap: 10px;
+}
+.enc-img-fallback svg { width: 36px; height: 36px; opacity: 0.4; }
+.enc-img-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.55), transparent);
+    padding: 1rem 0.9rem 0.6rem;
+    font-size: 0.7rem; color: rgba(255,255,255,0.85);
+    font-weight: 500;
+}
+
+/* ── Economic Impact Callout ──────────────────────────────── */
+.enc-impact-box {
+    margin: 0 1.4rem 0.9rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--text-primary);
+    border-radius: 10px; padding: 0.85rem 1rem;
+}
+.enc-impact-title {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.69rem; font-weight: 700;
+    letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--text-primary); margin-bottom: 0.4rem;
+}
+.enc-impact-title svg { width: 13px; height: 13px; flex-shrink: 0; }
+.enc-impact-text {
+    font-size: 0.81rem; color: var(--text-secondary); line-height: 1.6;
+}
+
+/* ── Accordion ────────────────────────────────────────────── */
+.enc-accordion { margin: 0 1.4rem 1.4rem; }
+.enc-accord-item {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 0.4rem; overflow: hidden;
+}
+.enc-accord-trigger {
+    width: 100%; display: flex; align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 0.9rem; background: transparent; border: none;
+    color: var(--text-secondary); font-size: 0.81rem; font-weight: 600;
+    cursor: pointer; text-align: left; font-family: inherit;
+    transition: color 0.18s;
+}
+.enc-accord-trigger:hover { color: var(--text-primary); }
+.enc-accord-trigger .acc-icon { transition: transform 0.3s; flex-shrink: 0; }
+.enc-accord-trigger[aria-expanded="true"] { color: var(--text-primary); }
+.enc-accord-trigger[aria-expanded="true"] .acc-icon { transform: rotate(180deg); }
+.enc-accord-body {
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.35s cubic-bezier(.4,0,.2,1);
+    padding: 0 0.9rem;
+}
+.enc-accord-body.open { max-height: 600px; padding: 0 0.9rem 0.75rem; }
+.enc-accord-body ul { list-style: none; margin: 0; padding: 0; }
+.enc-accord-body li {
+    padding: 0.32rem 0; font-size: 0.8rem;
+    color: var(--text-secondary); line-height: 1.55;
+    display: flex; align-items: flex-start; gap: 7px;
+}
+.enc-accord-body li::before {
+    content: '▸'; color: var(--text-muted);
+    font-size: 0.6rem; margin-top: 5px; flex-shrink: 0;
+}
+.enc-accord-body .env-note {
+    font-size: 0.78rem; color: var(--text-secondary);
+    background: var(--card-bg);
+    border-left: 3px solid var(--border);
+    border-radius: 0 8px 8px 0;
+    padding: 0.55rem 0.75rem;
+    margin-top: 0.45rem; line-height: 1.55;
+}
+
+/* ── Card Footer ──────────────────────────────────────────── */
+.enc-card-footer {
+    padding: 0.75rem 1.4rem 1.3rem;
+    display: flex; align-items: center; justify-content: space-between;
+    border-top: 1px solid var(--border);
+}
+.enc-score-bar-wrap { flex: 1; max-width: 150px; }
+.enc-score-label {
+    font-size: 0.68rem; color: var(--text-muted); margin-bottom: 4px;
+}
+.enc-score-bar-bg {
+    background: var(--bg-surface); border: 1px solid var(--border);
+    border-radius: 99px; height: 6px; overflow: hidden;
+}
+.enc-score-bar-fill {
+    height: 100%; border-radius: 99px;
+    background: var(--text-primary);
+    transition: width 1s ease;
+}
+/* Higher severity = higher opacity fill */
+.enc-card[data-severity="None"]     .enc-score-bar-fill { opacity: 0.3; }
+.enc-card[data-severity="Moderate"] .enc-score-bar-fill { opacity: 0.6; }
+.enc-card[data-severity="High"]     .enc-score-bar-fill { opacity: 0.85; }
+.enc-card[data-severity="Very High"].enc-score-bar-fill { opacity: 1; }
+
+.enc-diagnose-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 0.42rem 0.85rem; border-radius: 99px;
+    font-size: 0.76rem; font-weight: 600;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-secondary); text-decoration: none;
+    transition: all 0.18s; font-family: inherit;
+}
+.enc-diagnose-btn:hover {
+    background: var(--text-primary);
+    color: var(--bg-dark);
+    border-color: var(--text-primary);
+}
+
+/* ── Empty State ──────────────────────────────────────────── */
+#enc-empty {
+    display: none; text-align: center;
+    padding: 4rem 2rem; color: var(--text-muted);
+}
+#enc-empty svg { width: 56px; height: 56px; margin-bottom: 1rem; opacity: 0.25; }
+
+/* ── Footer CTA ───────────────────────────────────────────── */
+.enc-footer-cta {
+    text-align: center; padding: 1.5rem 1rem 2.5rem;
+    border-top: 1px solid var(--border);
+}
+.enc-footer-cta p { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 1rem; }
+.enc-footer-cta a {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0.7rem 1.8rem;
+    background: var(--text-primary);
+    color: var(--bg-dark);
+    border-radius: 10px; text-decoration: none;
+    font-weight: 700; font-size: 0.88rem;
+    box-shadow: var(--shadow);
+    transition: opacity 0.18s, transform 0.18s;
+}
+.enc-footer-cta a:hover { opacity: 0.85; transform: translateY(-2px); }
+
+/* ── Mobile ───────────────────────────────────────────────── */
+@media (max-width: 600px) {
+    .enc-hero { padding: 2rem 1rem 1.5rem; }
+    .enc-hero h1 { font-size: 1.9rem; }
+    .enc-stats-row { gap: 0.65rem; }
+    .enc-stat-pill { padding: 0.45rem 0.8rem; font-size: 0.76rem; }
+    .enc-grid { gap: 1.1rem; }
+}
+</style>
+
+<!-- ═══════════════ HERO SECTION ═══════════════ -->
+<div class="enc-hero">
+    <div class="enc-hero-tag">
+        <img src="/icons/8645362.png" class="enc-ico enc-ico-noinvert" alt="dragon fruit" style="width:14px;height:14px;">
+        Disease Encyclopedia
+    </div>
+
+    <h1>Dragon Fruit<br>Disease Reference</h1>
+
+    <p class="enc-hero-sub">
+        A comprehensive multilingual guide to the 6 disease classes classified by our AI system —
+        field-validated visual symptoms, agronomic advice, and economic impact data
+        to help Indian farmers protect their crops and income.
+    </p>
+
+
+</div>
+
+<hr class="enc-divider">
+
+<!-- ═══════════════ FILTER BAR ═══════════════ -->
+<div class="enc-filter-bar">
+    <div class="enc-search-wrap">
+        <svg class="enc-search-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="enc-search" placeholder="Search disease, pathogen…" autocomplete="off">
+    </div>
+    <div class="enc-filter-pills">
+        <button class="enc-filter-pill active" data-sev="All" onclick="filterCards(this)">All</button>
+        <button class="enc-filter-pill" data-sev="None" onclick="filterCards(this)"><img src="/icons/enc_healthy.png" class="enc-ico" alt=""> Healthy</button>
+        <button class="enc-filter-pill" data-sev="Moderate" onclick="filterCards(this)"><img src="/icons/enc_alert.png" class="enc-ico" alt=""> Moderate</button>
+        <button class="enc-filter-pill" data-sev="High" onclick="filterCards(this)"><img src="/icons/enc_alert.png" class="enc-ico" alt=""> High</button>
+        <button class="enc-filter-pill" data-sev="Very High" onclick="filterCards(this)"><img src="/icons/enc_alert.png" class="enc-ico" alt=""> Very High</button>
+    </div>
+</div>
+
+<!-- ═══════════════ DISEASE GRID ═══════════════ -->
+<div class="enc-grid" id="enc-grid">
+
+{% set sev_class_map = {
+    "None": "sev-none",
+    "Moderate": "sev-moderate",
+    "High": "sev-high",
+    "Very High": "sev-veryhigh"
+} %}
+{% set sev_icon_map = {
+    "None": "<img src='/icons/enc_healthy.png' class='enc-ico' alt='healthy'>",
+    "Moderate": "<img src='/icons/enc_alert.png' class='enc-ico' alt='moderate'>",
+    "High": "<img src='/icons/enc_alert.png' class='enc-ico' alt='high'>",
+    "Very High": "<img src='/icons/enc_alert.png' class='enc-ico' alt='very high'>"
+} %}
+
+{% for name, info in diseases.items() %}
+{% set sev = info.severity %}
+{% set score = info.severity_score %}
+{% set sev_css = sev_class_map.get(sev, 'sev-moderate') %}
+{% set bar_pct = (score / 4 * 100)|round|int %}
+
+<div class="enc-card"
+     data-severity="{{ sev }}"
+     data-name="{{ name.lower() }}"
+     data-pathogen="{{ (info.pathogen or '')|lower }}"
+     id="card-{{ name|lower|replace('_', '-') }}">
+
+    <!-- HEADER -->
+    <div class="enc-card-header">
+        <div>
+            <div class="enc-disease-name">{{ name.replace('_', ' ') }}</div>
+            {% if info.pathogen %}
+            <div class="enc-pathogen"><em>{{ info.pathogen }}</em></div>
+            {% else %}
+            <div class="enc-pathogen">No pathogen — Optimal health</div>
+            {% endif %}
+        </div>
+        <span class="enc-severity-badge {{ 'sev-veryhigh' if sev == 'Very High' }}">
+            {{ sev_icon_map.get(sev, '●') | safe }} {{ sev }}
+        </span>
+    </div>
+
+    <!-- DESCRIPTION -->
+    <p class="enc-desc">{{ info.description }}</p>
+
+    <!-- REFERENCE IMAGE -->
+    {% if info.reference_image %}
+    <div class="enc-img-wrap" id="img-wrap-{{ loop.index }}">
+        <img src="{{ url_for('static', filename=info.reference_image) }}"
+             alt="{{ name }} reference image"
+             loading="lazy"
+             onerror="this.style.display='none'; document.getElementById('fallback-{{ loop.index }}').style.display='flex';">
+        <div class="enc-img-label">
+            <img src="/icons/563d0201e4359c2e890569e254ea14790eb370b71d08b6de5052511cc0352313.jpg" class="enc-ico" alt="photo" style="width:12px;height:12px;filter:invert(1);"> Field reference — {{ name.replace('_', ' ') }}
+        </div>
+        <div class="enc-img-fallback" id="fallback-{{ loop.index }}">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <span>{{ name.replace('_', ' ') }}</span>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ECONOMIC IMPACT -->
+    {% if info.economic_impact %}
+    <div class="enc-impact-box">
+        <div class="enc-impact-title">
+            <img src="/icons/enc_rupee.png" class="enc-ico" alt="economic impact">
+            Estimated Financial Risk &amp; Crop Loss
+        </div>
+        <div class="enc-impact-text">{{ info.economic_impact }}</div>
+    </div>
+    {% endif %}
+
+    <!-- ACCORDION -->
+    <div class="enc-accordion">
+
+        <div class="enc-accord-item">
+            <button class="enc-accord-trigger" aria-expanded="false" onclick="toggleAccord(this)">
+                <span><img src="/icons/1730090.png" class="enc-ico" alt="symptoms"> Visual Symptoms ({{ info.visual_cues|length }} signs)</span>
+                <svg class="acc-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="enc-accord-body">
+                <ul>
+                    {% for cue in info.visual_cues %}<li>{{ cue }}</li>{% endfor %}
+                </ul>
+                {% if info.environmental %}
+                <div class="env-note">
+                    <img src="/icons/pngtree-flat-temperature-icon-download-image_1148255.jpg" class="enc-ico" alt="temperature"> {{ info.environmental }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="enc-accord-item">
+            <button class="enc-accord-trigger" aria-expanded="false" onclick="toggleAccord(this)">
+                <span><img src="/icons/enc_shield.png" class="enc-ico" alt="prevention"> Prevention ({{ info.prevention|length }} tips)</span>
+                <svg class="acc-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="enc-accord-body">
+                <ul>{% for tip in info.prevention %}<li>{{ tip }}</li>{% endfor %}</ul>
+            </div>
+        </div>
+
+        <div class="enc-accord-item">
+            <button class="enc-accord-trigger" aria-expanded="false" onclick="toggleAccord(this)">
+                <span><img src="/icons/enc_pill.png" class="enc-ico" alt="treatment"> Treatment ({{ info.treatment|length }} steps)</span>
+                <svg class="acc-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="enc-accord-body">
+                <ul>{% for step in info.treatment %}<li>{{ step }}</li>{% endfor %}</ul>
+            </div>
+        </div>
+
+        {% if info.literature is defined and info.literature %}
+        <div class="enc-accord-item">
+            <button class="enc-accord-trigger" aria-expanded="false" onclick="toggleAccord(this)">
+                <span><img src="/icons/enc_book.png" class="enc-ico" alt="references"> References ({{ info.literature|length }})</span>
+                <svg class="acc-icon" xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="enc-accord-body">
+                <ul>
+                    {% for ref in info.literature %}<li>{{ ref }}</li>{% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="enc-card-footer">
+        <div class="enc-score-bar-wrap">
+            <div class="enc-score-label">Severity {{ score }}/4</div>
+            <div class="enc-score-bar-bg">
+                <div class="enc-score-bar-fill" style="width: {{ bar_pct }}%;"></div>
+            </div>
+        </div>
+        <a href="{{ url_for('disease_page') }}" class="enc-diagnose-btn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            Diagnose Now
+        </a>
+    </div>
+
+</div><!-- end enc-card -->
+{% endfor %}
+
+</div><!-- end enc-grid -->
+
+<!-- Empty state -->
+<div id="enc-empty">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <p style="font-size:1.05rem; color: var(--text-secondary);">No diseases match your search.</p>
+    <p style="font-size:0.83rem; color: var(--text-muted);">Try a different keyword or severity filter.</p>
+</div>
+
+<!-- FOOTER CTA -->
+<div class="enc-footer-cta">
+    <p>Powered by ConViTX + YOLO · Research grounded 2024–25 literature · Data in Indian Rupees (INR)</p>
+    <a href="{{ url_for('disease_page') }}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        Upload Image for AI Diagnosis
+    </a>
+</div>
+
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+function toggleAccord(btn) {
+    const body = btn.nextElementSibling;
+    const isOpen = btn.getAttribute('aria-expanded') === 'true';
+    const parent = btn.closest('.enc-accordion');
+    parent.querySelectorAll('.enc-accord-trigger').forEach(b => {
+        b.setAttribute('aria-expanded', 'false');
+        b.nextElementSibling.classList.remove('open');
+    });
+    if (!isOpen) {
+        btn.setAttribute('aria-expanded', 'true');
+        body.classList.add('open');
+    }
+}
+
+function filterCards(pill) {
+    document.querySelectorAll('.enc-filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    applyFilters(pill.dataset.sev, document.getElementById('enc-search').value.trim().toLowerCase());
+}
+
+document.getElementById('enc-search').addEventListener('input', function() {
+    const activePill = document.querySelector('.enc-filter-pill.active');
+    applyFilters(activePill ? activePill.dataset.sev : 'All', this.value.trim().toLowerCase());
+});
+
+function applyFilters(sev, query) {
+    let visible = 0;
+        const cardSev = card.dataset.severity;
+        const cardName = card.dataset.name;
+        const cardPath = card.dataset.pathogen;
+        const matchSev = (sev === 'All') || (cardSev === sev);
+        const matchQuery = !query || cardName.includes(query) || cardPath.includes(query);
+        if (matchSev && matchQuery) {
+            card.style.display = '';
+            visible++;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    document.getElementById('enc-empty').style.display = (visible === 0) ? 'block' : 'none';
+}
+
+// ── Animate severity bars on load ──────────────────────────────
+(function() {
+    const fills = document.querySelectorAll('.enc-score-bar-fill');
+    fills.forEach(f => {
+        const w = f.style.width;
+        f.style.width = '0';
+        setTimeout(() => { f.style.width = w; }, 300);
+    });
+})();
+
+// ── Intersection Observer for card entrance animation ──────────
+(function() {
+    if (!('IntersectionObserver' in window)) return;
+    const style = document.createElement('style');
+    style.textContent = `.enc-card { opacity: 0; transform: translateY(30px); transition: opacity 0.5s ease, transform 0.5s ease, box-shadow 0.3s !important; }
+    .enc-card.visible { opacity: 1; transform: translateY(0); }`;
+    document.head.appendChild(style);
+    const obs = new IntersectionObserver((entries) => {
+        entries.forEach((e, i) => {
+            if (e.isIntersecting) {
+                setTimeout(() => e.target.classList.add('visible'), e.target.dataset.delay || 0);
+                obs.unobserve(e.target);
+            }
+        });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.enc-card').forEach((card, i) => {
+        card.dataset.delay = i * 80;
+        obs.observe(card);
+    });
+})();
+</script>
+{% endblock %}

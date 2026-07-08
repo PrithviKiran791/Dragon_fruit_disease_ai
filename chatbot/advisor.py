@@ -42,6 +42,12 @@ DISEASE_KNOWLEDGE = {
         ],
         "environmental":  "Optimal growing conditions: 20–35 °C, relative humidity 60–80 %, full sun.",
         "severity_score": 0,
+        "economic_impact": (
+            "No crop loss. A healthy plant maintains 100% of its market value and yield potential. "
+            "Routine preventative care costs approximately ₹2,000–₹4,000 per acre per season, "
+            "yielding a strong return on investment with no disease-related revenue risk."
+        ),
+        "reference_image": "images/encyclopedia/healthy.jpg",
     },
 
     "Anthracnose": {
@@ -75,6 +81,14 @@ DISEASE_KNOWLEDGE = {
             "Peng et al. (2024). Integrated management of Colletotrichum on dragon fruit. Plant Pathology, 73(4), 889–901.",
             "Nguyen et al. (2025). Biocontrol of dragon fruit anthracnose using Trichoderma asperellum. BioControl, 70(1), 45–58.",
         ],
+        "economic_impact": (
+            "Directly reduces marketable field yield by 15–30%. During transit and cold storage, "
+            "post-harvest fruit rotting escalates losses to 60%, severely impacting export income. "
+            "In plantation surveys, up to 30% of plants can be affected simultaneously, driving "
+            "fungicide costs up by ₹6,000–₹12,000 per acre per season. Early intervention can "
+            "recover up to 70% of projected revenue."
+        ),
+        "reference_image": "images/encyclopedia/anthracnose.jpg",
     },
 
     "Brown_Stem_Spot": {
@@ -107,6 +121,13 @@ DISEASE_KNOWLEDGE = {
         "literature": [
             "Li et al. (2024). First report of Bipolaris cactivora causing brown spot on dragon fruit in Southeast Asia. Plant Disease, 108(3), 701.",
         ],
+        "economic_impact": (
+            "Restricts stem photosynthetic capacity, causing fruit weight and size reduction of 20–40%. "
+            "Lesion-damaged fruits face heavy rejection in export markets, fetching 30–50% lower prices locally. "
+            "In severe rainy seasons, entire cladode sections are abandoned. Fungicide management adds "
+            "₹4,000–₹8,000 per acre to cultivation costs."
+        ),
+        "reference_image": "images/encyclopedia/brown_stem_spot.jpg",
     },
 
     "Gray_Blight": {
@@ -140,6 +161,13 @@ DISEASE_KNOWLEDGE = {
             "Chen et al. (2024). Pestalotiopsis species associated with gray blight of pitaya in Guangxi, China. Mycological Progress, 23(1), 12.",
             "Wang et al. (2025). Integrated management of Pestalotiopsis blight on Hylocereus. Crop Protection, 179, 106628.",
         ],
+        "economic_impact": (
+            "Surface scab and blighted lesions eliminate 30–50% price premium in high-value fresh fruit markets. "
+            "As a secondary opportunistic pathogen, Gray Blight typically follows storm or mechanical damage, "
+            "affecting up to 25% of exposed plants. Combined with primary disease management, losses "
+            "can reach ₹15,000–₹30,000 per acre in bad seasons."
+        ),
+        "reference_image": "images/encyclopedia/gray_blight.jpg",
     },
 
     "Soft_Rot": {
@@ -174,6 +202,13 @@ DISEASE_KNOWLEDGE = {
             "Huang et al. (2024). Characterization of Pectobacterium causing soft rot in pitahaya. European J. Plant Pathol., 168(2), 301–315.",
             "Zhao et al. (2025). Biofilm-based biocontrol of bacterial soft rot in dragon fruit. Biological Control, 192, 105502.",
         ],
+        "economic_impact": (
+            "One of the fastest-acting destructive diseases — entire cladodes collapse within 3–5 days of infection. "
+            "Causes 50–70% loss of affected branch biomass in a single outbreak event. "
+            "Infected fruits are completely unmarketable (100% rejection). Post-monsoon outbreaks can destroy "
+            "20–35% of total seasonal harvest, costing ₹20,000–₹50,000 per acre in extreme cases."
+        ),
+        "reference_image": "images/encyclopedia/soft_rot.jpg",
     },
 
     "Stem_Canker": {
@@ -209,6 +244,13 @@ DISEASE_KNOWLEDGE = {
             "Shang et al. (2025). Amino-oligosaccharide elicitors suppress Neoscytalidium dimidiatum in pitaya. Pesticide Biochemistry and Physiology, 198, 105732.",
             "Masyahit et al. (2024). New pathogenicity evidence for Neoscytalidium on Hylocereus spp. Phytopathology, 114(2), 234–245.",
         ],
+        "economic_impact": (
+            "The single most destructive dragon fruit pathogen globally. Causes 40–80% yield reduction "
+            "in affected orchards, with disease severity reaching 60–100% incidence in untreated fields. "
+            "Can kill entire plants, forcing farmers to replant — a cost of ₹25,000–₹60,000 per acre. "
+            "Immediate aggressive intervention is critical to prevent total orchard failure."
+        ),
+        "reference_image": "images/encyclopedia/stem_canker.jpg",
     },
 }
 
