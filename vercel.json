@@ -1,7 +1,9 @@
 {
   "version": 2,
-  "env": {
-    "VERCEL_SUPPORT_LARGE_FUNCTIONS": "1"
+  "build": {
+    "env": {
+      "VERCEL_SUPPORT_LARGE_FUNCTIONS": "1"
+    }
   },
   "functions": {
     "api/index.py": {
