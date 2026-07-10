@@ -140,6 +140,25 @@ _yolo_detector = None
 _vqa_model = None
 _vqa_tokenizer = None
 
+def clear_memory(exclude=None):
+    """Unload other models and collect garbage to stay within Render's 512MB RAM free tier limit."""
+    global _disease_model, _disease_target_layer, _quality_model, _yolo_detector, _vqa_model, _vqa_tokenizer
+    import gc
+    
+    if exclude != "disease":
+        _disease_model = None
+        _disease_target_layer = None
+    if exclude != "quality":
+        _quality_model = None
+    if exclude != "yolo":
+        _yolo_detector = None
+    if exclude != "vqa":
+        _vqa_model = None
+        _vqa_tokenizer = None
+        
+    gc.collect()
+
+
 # YOLO class metadata (mirrors detect_disease.py)
 YOLO_CLASS_NAMES = {
     0: "Anthracnose",
@@ -168,6 +187,7 @@ def _load_quality_classes():
 def _get_disease_artifacts():
     global _disease_model, _disease_target_layer
     if _disease_model is None:
+        clear_memory(exclude="disease")
         disease_model_path = DISEASE_MODEL_PATH
         if not os.path.exists(disease_model_path) and os.path.exists(LEGACY_DISEASE_MODEL_PATH):
             disease_model_path = LEGACY_DISEASE_MODEL_PATH
@@ -183,6 +203,7 @@ def _get_disease_artifacts():
 def _get_quality_model():
     global _quality_model
     if _quality_model is None:
+        clear_memory(exclude="quality")
         quality_classes = _load_quality_classes()
         _quality_model = load_convitx_model(
             QUALITY_MODEL_PATH,
@@ -332,6 +353,7 @@ def _is_likely_dragonfruit(img_path: str, sample_ratio: float = 0.05) -> bool:
 def _get_yolo_detector():
     global _yolo_detector
     if _yolo_detector is None:
+        clear_memory(exclude="yolo")
         sys.path.insert(0, ROOT)
         from detect_disease import DragonFruitDetector
         _yolo_detector = DragonFruitDetector(
@@ -347,6 +369,7 @@ def _get_vqa_artifacts():
     """Lazy-load VQA model + tokenizer for inference."""
     global _vqa_model, _vqa_tokenizer
     if _vqa_model is None:
+        clear_memory(exclude="vqa")
         from models.vqa_model import build_vqa_model
         from models.vqa_tokenizer import VQATokenizer
         import json as _json
@@ -1113,11 +1136,8 @@ def predict_vqa():
         flash("Invalid image detected! Please upload a clear picture of a dragon fruit plant, fruit, or stem.", "error")
         return redirect(url_for("vqa_page"))
 
-    try:
-        vqa_model, vqa_tokenizer = _get_vqa_artifacts()
-    except Exception as e:
-        flash(f"VQA model not loaded: {e}", "error")
-        return redirect(url_for("vqa_page"))
+    pil_img = Image.open(img_path).convert("RGB")
+    image_tensor = infer_transforms(pil_img).unsqueeze(0)
 
     # Extract vision features using disease backbone
     try:
@@ -1126,11 +1146,17 @@ def predict_vqa():
         flash("Vision backbone not found.", "error")
         return redirect(url_for("vqa_page"))
 
-    pil_img = Image.open(img_path).convert("RGB")
-    image_tensor = infer_transforms(pil_img).unsqueeze(0)
-
     # Extract features from backbone (supports both architectures)
     vision_feat = _extract_vqa_features(disease_model, image_tensor)  # [1, feat_dim]
+
+    # Clear memory (frees disease model) before loading VQA model
+    clear_memory()
+
+    try:
+        vqa_model, vqa_tokenizer = _get_vqa_artifacts()
+    except Exception as e:
+        flash(f"VQA model not loaded: {e}", "error")
+        return redirect(url_for("vqa_page"))
 
     # Tokenize question
     token_ids = vqa_tokenizer.encode(question, max_len=32, padding=True)
@@ -1207,13 +1233,16 @@ def api_vqa():
                 "error": "Invalid image detected. Please upload a dragon fruit plant, fruit, or stem image."
             }), 400
 
-        vqa_model, vqa_tokenizer = _get_vqa_artifacts()
-        disease_model, _ = _get_disease_artifacts()
-
         image_tensor = infer_transforms(pil_img).unsqueeze(0)
 
-        # Extract features from backbone (supports both architectures)
+        # Extract features using disease backbone first
+        disease_model, _ = _get_disease_artifacts()
         vision_feat = _extract_vqa_features(disease_model, image_tensor)
+
+        # Clear memory (frees disease model) before loading VQA model
+        clear_memory()
+
+        vqa_model, vqa_tokenizer = _get_vqa_artifacts()
 
         token_ids = vqa_tokenizer.encode(question, max_len=32, padding=True)
         token_tensor = torch.tensor([token_ids], dtype=torch.long)
