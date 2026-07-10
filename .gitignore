@@ -16,6 +16,14 @@ models/*.pth
 models/*.pt
 models/*training_curves*.png
 
+# Allow specific lightweight models for Flask app deployment
+!models/best_convitx_pretrained.pth
+!models/quality_convitx.pth
+!models/yolo_dragon_best.pt
+!models/best_vqa.pth
+!models/vqa_vocab.json
+!models/best_vqa_config.json
+
 # YOLO training runs
 runs/
 

@@ -76,8 +76,13 @@ QUALITY_CLASS_NAMES = [
 QUALITY_CLASS_FILE = os.path.join(ROOT, "models", "quality_classes.txt")
 
 IMG_SIZE = 224
-UPLOAD_DIR  = os.path.join(os.path.dirname(__file__), "static", "uploads")
+# Use /tmp directory on Vercel as filesystem is read-only
+if os.environ.get("VERCEL"):
+    UPLOAD_DIR = "/tmp/uploads"
+else:
+    UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "static", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 
 ALLOWED_EXT = {"jpg", "jpeg", "png", "webp", "bmp"}
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -120,6 +125,12 @@ ICONS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 def serve_icon(filename):
     from flask import send_from_directory
     return send_from_directory(ICONS_DIR, filename)
+
+# ── Serve uploaded files from Vercel dynamic /tmp path ────────────────────────
+@app.route("/static/uploads/<path:filename>")
+def serve_uploaded_file(filename):
+    from flask import send_from_directory
+    return send_from_directory(UPLOAD_DIR, filename)
 
 # ── Lazy-loaded models ───────────────────────────────────────────────────────
 _disease_model = None
