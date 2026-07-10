@@ -19,3 +19,5 @@ ultralytics>=8.0.0
 requests>=2.28.0
 python-dotenv>=1.0.0
 Flask-Babel>=4.0.0
+gunicorn>=21.0.0
+
