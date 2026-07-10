@@ -1,9 +1,13 @@
 {
   "version": 2,
+  "env": {
+    "VERCEL_SUPPORT_LARGE_FUNCTIONS": "1"
+  },
   "functions": {
     "api/index.py": {
       "maxDuration": 60,
-      "memory": 2048
+      "memory": 2048,
+      "excludeFiles": "models/best_resnet50.pth | models/quality_resnet50.pth | dataset/** | runs/** | results/**"
     }
   },
   "routes": [
