@@ -1,10 +1,10 @@
 """
 train_yolo_directml.py
 ═══════════════════════════════════════════════════════════════════════
-Train YOLOv8 using AMD GPU on Windows via DirectML (torch-directml).
+Train YOLOv8 on NVIDIA CUDA-capable GPUs.
 
-Prerequisites:
-    pip install torch-directml
+This project now prefers CUDA for NVIDIA laptops/desktops. AMD DirectML is only
+kept as a fallback path for older setups; CUDA is the default for NVIDIA hardware.
 
 Usage:
     python train_yolo_directml.py
@@ -38,22 +38,31 @@ def main():
 
     if device is None:
         try:
-            import torch_directml
-            # DirectML is detected but does NOT support torch.unique(return_counts=True)
-            # which YOLOv8's loss function requires — so we MUST use CPU.
-            _ = torch_directml.device()  # just test it's available
-            print("  ⚠  AMD GPU (DirectML) detected but NOT compatible with YOLOv8 training.")
-            print("     DirectML is missing 'unique(return_counts)' — using CPU instead.")
-            print("     (This is a DirectML limitation, not a code bug.)")
-            device = "cpu"
-        except ImportError:
-            device = "cpu"
+            import torch
+            if torch.cuda.is_available():
+                device = "0"
+                print("  ✔  NVIDIA CUDA detected — using GPU acceleration.")
+            else:
+                try:
+                    import torch_directml
+                    _ = torch_directml.device()
+                    print("  ⚠  AMD GPU (DirectML) detected.")
+                    print("     YOLOv8 may still require CPU fallback depending on the backend.")
+                    device = "cpu"
+                except ImportError:
+                    device = "cpu"
+                except Exception:
+                    device = "cpu"
         except Exception:
             device = "cpu"
 
-    # Always use CPU (only reliable option for AMD on Windows)
-    device = "cpu"
-    print(f"  ✔  Using device: CPU (AMD GPU not supported for YOLOv8 training on Windows)")
+    if device is None:
+        device = "cpu"
+
+    if str(device) == "0" or str(device).lower() == "cuda":
+        print("  ✔  Using device: CUDA (NVIDIA GPU)")
+    else:
+        print(f"  ✔  Using device: {device}")
 
     print(f"\n🐲  Dragon Fruit YOLOv8 Training")
     print(f"   Model  : {args.model}")
@@ -71,12 +80,10 @@ def main():
 
     model = YOLO(args.model)
 
-    # DirectML passes a device object — convert to string for ultralytics,
-    # and always disable AMP since ultralytics' check_amp() calls
-    # torch.cuda.get_device_name() which crashes on non-CUDA devices.
+    # Prefer CUDA on NVIDIA hardware. DirectML is only used as a fallback on AMD.
     is_directml = hasattr(device, '__class__') and 'directml' in str(type(device)).lower()
     device_arg  = str(device) if is_directml else device
-    use_amp     = False  # Must be False for DirectML / CPU (no CUDA AMP)
+    use_amp     = str(device).lower() in {"0", "cuda", "cuda:0"}
 
     results = model.train(
         data    = str(DATA_YAML),

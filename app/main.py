@@ -16,6 +16,8 @@ Routes:
 import os
 import sys
 import uuid
+import time
+import logging
 
 import base64
 import io
@@ -87,12 +89,14 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 ALLOWED_EXT = {"jpg", "jpeg", "png", "webp", "bmp"}
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+ENABLE_IMAGE_OOD_GATE = os.environ.get("ENABLE_IMAGE_OOD_GATE", "0").lower() in {"1", "true", "yes"}
 GEMINI_API_URL = (
     f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 )
 
 # ── Flask app ─────────────────────────────────────────────────────────────────
 app = Flask(__name__)
+app.logger.setLevel(logging.INFO)
 app.secret_key = "dragonfruit-secret-key"
 
 # ── Flask-Babel i18n ──────────────────────────────────────────────────────────
@@ -200,6 +204,18 @@ def _get_disease_artifacts():
     return _disease_model, _disease_target_layer
 
 
+def _get_disease_model():
+    """Backward-compatible wrapper for older camera/API code paths."""
+    model, _ = _get_disease_artifacts()
+    return model
+
+
+def _get_target_layer():
+    """Backward-compatible wrapper for older camera/API code paths."""
+    _, target_layer = _get_disease_artifacts()
+    return target_layer
+
+
 def _get_quality_model():
     global _quality_model
     if _quality_model is None:
@@ -218,11 +234,28 @@ def _allowed(filename: str) -> bool:
 
 
 def _validate_dragonfruit_upload(img_path: str) -> bool:
-    """Return True only when the upload looks like dragon fruit content.
+    """Validate that an upload is a readable image.
 
-    Gemini is used first when available. If the API call fails, the local
-    color heuristic is used instead so validation does not silently fail open.
+    Disease images can be brown, gray, or mostly covered by lesions, so a
+    color-based dragon-fruit gate incorrectly rejects legitimate uploads. The
+    optional OOD gate is disabled by default; model inference should decide
+    the disease class for any valid image.
     """
+    try:
+        with Image.open(img_path) as image:
+            image.verify()
+        with Image.open(img_path) as image:
+            width, height = image.size
+            if width < 32 or height < 32:
+                return False
+    except (OSError, ValueError):
+        return False
+
+    if not ENABLE_IMAGE_OOD_GATE:
+        app.logger.info("Upload validation accepted readable image: %s", img_path)
+        return True
+
+    app.logger.warning("Optional image content gate enabled for %s", img_path)
     validation_source = "heuristic"
     heuristic_ok = _is_likely_dragonfruit(img_path)
     try:
@@ -415,6 +448,8 @@ def _extract_vqa_features(backbone: torch.nn.Module, image_tensor: torch.Tensor)
     """
     import torch.nn.functional as _F
     backbone.eval()
+    backbone_device = next(backbone.parameters()).device
+    image_tensor = image_tensor.to(backbone_device)
     with torch.no_grad():
         if hasattr(backbone, 'cnn_branch'):
             # ConViTXPretrained
@@ -439,7 +474,7 @@ def _extract_vqa_features(backbone: torch.nn.Module, image_tensor: torch.Tensor)
             tokens   = backbone.vit_norm(tokens)
             vit_feat = tokens.mean(dim=1)
 
-            return torch.cat([cnn_feat, vit_feat], dim=1)
+            return torch.cat([cnn_feat, vit_feat], dim=1).cpu()
         else:
             # Legacy ConViTXSmall
             _feats = {}
@@ -448,7 +483,7 @@ def _extract_vqa_features(backbone: torch.nn.Module, image_tensor: torch.Tensor)
             h = backbone.pool.register_forward_hook(_hook)
             _ = backbone(image_tensor)
             h.remove()
-            return _feats["f"].flatten(1)
+            return _feats["f"].flatten(1).cpu()
 
 
 def _normalize_chat_history(history):
@@ -663,12 +698,16 @@ def camera_page():
 @app.route("/predict_disease", methods=["POST"])
 def predict_disease():
     """Accept uploaded image → inference → Grad-CAM → advisor → results."""
+    started_at = time.perf_counter()
+    app.logger.info("Disease request started: method=%s remote=%s", request.method, request.remote_addr)
     if "image" not in request.files:
+        app.logger.warning("Disease request missing image field")
         flash("No file uploaded.", "error")
         return redirect(url_for("disease_page"))
 
     file = request.files["image"]
     if file.filename == "" or not _allowed(file.filename):
+        app.logger.warning("Disease request rejected filename: %r", file.filename)
         flash("Please upload a valid image (jpg, png, webp).", "error")
         return redirect(url_for("disease_page"))
 
@@ -678,15 +717,19 @@ def predict_disease():
     img_name   = f"{uid}.{ext}"
     img_path   = os.path.join(UPLOAD_DIR, img_name)
     file.save(img_path)
+    app.logger.info("Disease image saved: name=%s bytes=%s", img_name, os.path.getsize(img_path))
 
     if not _validate_dragonfruit_upload(img_path):
+        app.logger.warning("Disease image rejected during readable-image validation: %s", img_name)
         if os.path.exists(img_path):
             os.remove(img_path)
         flash("Invalid image detected! Please upload a clear picture of a dragon fruit plant, fruit, or stem.", "error")
         return redirect(url_for("disease_page"))
 
     try:
+        model_started_at = time.perf_counter()
         disease_model, disease_target_layer = _get_disease_artifacts()
+        app.logger.info("Disease model ready in %.2fs", time.perf_counter() - model_started_at)
     except FileNotFoundError:
         flash(
             "Disease model not found. Place best_convitx_pretrained.pth (or best_convitx.pth) in models/.",
@@ -698,16 +741,23 @@ def predict_disease():
     image_tensor = infer_transforms(pil_img).unsqueeze(0)
     vision_feat = _extract_vqa_features(disease_model, image_tensor)
     torch.save(vision_feat, os.path.join(UPLOAD_DIR, f"{uid}_features.pt"))
+    app.logger.info("Disease feature extraction complete in %.2fs", time.perf_counter() - started_at)
 
     # Run Grad-CAM inference
     cam_name  = f"{uid}_gradcam.png"
     cam_path  = os.path.join(UPLOAD_DIR, cam_name)
+    cam_started_at = time.perf_counter()
     result    = run_gradcam(
         model        = disease_model,
         target_layer = disease_target_layer,
         image_path   = img_path,
         class_names  = DISEASE_CLASS_NAMES,
         save_path    = cam_path,
+    )
+    app.logger.info(
+        "Disease inference complete: class=%s confidence=%.3f gradcam=%.2fs total=%.2fs",
+        result["predicted_class"], result["confidence"],
+        time.perf_counter() - cam_started_at, time.perf_counter() - started_at,
     )
 
     # Save the overlay as a full-resolution image (not the tiny matplotlib panel)
@@ -1360,4 +1410,9 @@ def api_chat():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(
+        debug=os.environ.get("FLASK_DEBUG", "0").lower() in {"1", "true", "yes"},
+        use_reloader=False,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", "5000")),
+    )

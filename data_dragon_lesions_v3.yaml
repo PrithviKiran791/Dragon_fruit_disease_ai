@@ -1,0 +1,12 @@
+# Oversampled train split for YOLOv8s. Val/test match the original set.
+path: C:/Users/prady/Dragon Fruit/Dragon_fruit_disease_ai/dataset/yolo_v3
+train: images/train
+val: images/val
+test: images/test
+nc: 5
+names:
+  0: Anthracnose
+  1: Stem_Canker
+  2: Soft_Rot
+  3: Brown_Stem_Spot
+  4: Gray_Blight

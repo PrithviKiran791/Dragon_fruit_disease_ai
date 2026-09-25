@@ -1,0 +1,35 @@
+{
+  "best_val_accuracy": 97.8,
+  "best_macro_f1": 0.9777,
+  "classes": [
+    "Defective_Diseased",
+    "Healthy"
+  ],
+  "classification_report": {
+    "Defective_Diseased": {
+      "precision": 0.9899749373433584,
+      "recall": 0.9705159705159705,
+      "f1-score": 0.9801488833746899,
+      "support": 407.0
+    },
+    "Healthy": {
+      "precision": 0.9634146341463414,
+      "recall": 0.9875,
+      "f1-score": 0.9753086419753086,
+      "support": 320.0
+    },
+    "accuracy": 0.9779917469050894,
+    "macro avg": {
+      "precision": 0.9766947857448499,
+      "recall": 0.9790079852579853,
+      "f1-score": 0.9777287626749993,
+      "support": 727.0
+    },
+    "weighted avg": {
+      "precision": 0.9782840198426082,
+      "recall": 0.9779917469050894,
+      "f1-score": 0.978018378219529,
+      "support": 727.0
+    }
+  }
+}

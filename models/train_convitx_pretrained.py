@@ -69,14 +69,13 @@ def set_seed(seed: int):
 # ============================================================================ #
 def parse_args():
     default_data = os.path.normpath(os.path.join(
-        _SCRIPT_DIR, "..", "dataset",
-        "Dragon Fruit (Pitahaya)", "Dragon Fruit (Pitahaya)", "Converted Images",
+        _SCRIPT_DIR, "..", "dataset", "merged_6class_v2"
     ))
 
     p = argparse.ArgumentParser(description="Train ConViTX-Pretrained (MobileNetV3 CNN)")
     p.add_argument("--data-dir",      type=str,   default=default_data)
     p.add_argument("--save-dir",      type=str,   default=_SCRIPT_DIR)
-    p.add_argument("--epochs",        type=int,   default=60)
+    p.add_argument("--epochs",        type=int,   default=30)
     p.add_argument("--freeze-epochs", type=int,   default=5,
                    help="Phase 1: train ViT+head only (CNN frozen), then unfreeze. Set 0 when resuming.")
     p.add_argument("--batch-size",    type=int,   default=32)
@@ -368,8 +367,8 @@ def main():
     class_weights_np = class_weights_np.copy()
     if args.boost_class >= 0 and args.boost_class < num_classes:
         class_weights_np[args.boost_class] *= args.boost_factor
-        print(f"\n⚡ Boosting class [{args.boost_class}] "
-              f"{class_names[args.boost_class]} weight ×{args.boost_factor}")
+        print(f"\n[BOOST] Boosting class [{args.boost_class}] "
+              f"{class_names[args.boost_class]} weight x{args.boost_factor}")
     cw_tensor = torch.tensor(class_weights_np, dtype=torch.float32).to(device)
 
     # ------------------------------------------------------------------ #
@@ -540,7 +539,7 @@ def main():
         else:
             patience_ctr += 1
             if patience_ctr >= args.patience:
-                print(f"\n⏹  Early stopping at epoch {epoch}  (no improvement for {args.patience} epochs)")
+                print(f"\n[STOP] Early stopping at epoch {epoch} (no improvement for {args.patience} epochs)")
                 break
 
     elapsed = time.time() - start_time
@@ -553,7 +552,7 @@ def main():
 
     # Curves
     plot_curves(history, curves_path)
-    print(f"\nCurves → {curves_path}")
+    print(f"\nCurves -> {curves_path}")
 
     if best_wts is None:
         print("No improvements recorded.")
@@ -578,8 +577,8 @@ def main():
     print(report_str)
     cm = confusion_matrix(all_labels, all_preds, labels=list(range(num_classes)))
     print(f"Confusion Matrix:\n{cm}")
-    plot_confusion(cm, class_names, "ConViTX-Pretrained — Val Set", cm_path)
-    print(f"\nConfusion matrix → {cm_path}")
+    plot_confusion(cm, class_names, "ConViTX-Pretrained - Val Set", cm_path)
+    print(f"\nConfusion matrix -> {cm_path}")
 
     # ------------------------------------------------------------------ #
     # Save summary
@@ -605,14 +604,14 @@ def main():
     summary_path = os.path.join(save_dir, "convitx_pretrained_summary.json")
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
-    print(f"Summary JSON → {summary_path}")
+    print(f"Summary JSON -> {summary_path}")
 
     # Markdown report
     project_root = os.path.normpath(os.path.join(save_dir, ".."))
     _write_md(summary, class_names, args, project_root)
 
     print(f"\n{'='*60}")
-    print(f"  ✅ ConViTX-Pretrained Training COMPLETE")
+    print(f"  [OK] ConViTX-Pretrained Training COMPLETE")
     print(f"  Val Acc      : {best_val_acc * 100:.2f}%")
     print(f"  Val Macro-F1 : {best_val_f1:.4f}")
     print(f"  Checkpoint   : {ckpt_path}")

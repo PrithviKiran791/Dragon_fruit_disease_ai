@@ -1,0 +1,16 @@
+{
+  "baseline": {
+    "mAP50": 0.6677,
+    "mAP50-95": 0.4001,
+    "precision": 0.7106,
+    "recall": 0.6257
+  },
+  "new": {
+    "mAP50": 0.684471312111556,
+    "mAP50-95": 0.41476072137558456,
+    "precision": 0.6386427557685027,
+    "recall": 0.7159261191542396
+  },
+  "weights": "C:\\Users\\prady\\Dragon Fruit\\Dragon_fruit_disease_ai\\runs\\detect\\dragon_lesions_v3\\weights\\best.pt",
+  "replaced_best": true
+}
